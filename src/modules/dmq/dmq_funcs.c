@@ -167,6 +167,20 @@ done:
 }
 
 /**
+ * @brief free a package-memory list of duplicated DMQ nodes 
+ */
+static void free_dmq_node_snapshot(dmq_node_t *nodes)
+{
+	dmq_node_t *next;
+
+	while(nodes != NULL) {
+		next = nodes->next;
+		destroy_dmq_node(nodes, 0);
+		nodes = next;
+	}
+}
+
+/**
  * @brief broadcast a dmq message
  *
  * peer - the peer structure on behalf of which we are sending
@@ -179,6 +193,12 @@ int bcast_dmq_message1(dmq_peer_t *peer, str *body, dmq_node_t *except,
 		int incl_inactive)
 {
 	dmq_node_t *node;
+	dmq_node_t *target;
+	dmq_node_t *targets = NULL;
+	dmq_node_t *targets_tail = NULL;
+	dmq_node_t *next;
+	int result = 0;
+
 	LM_DBG("trying to acquire dmq_node_list->lock\n");
 	lock_get(&dmq_node_list->lock);
 	LM_DBG("acquired dmq_node_list->lock\n");
@@ -195,21 +215,53 @@ int bcast_dmq_message1(dmq_peer_t *peer, str *body, dmq_node_t *except,
 			node = node->next;
 			continue;
 		}
-		if(dmq_send_message(
-				   peer, body, node, resp_cback, max_forwards, content_type)
-				< 0) {
-			LM_ERR("error sending dmq message\n");
-			goto error;
+		target = pkg_dup_node(node);
+		if(target == NULL) {
+			LM_ERR("failed to duplicate DMQ broadcast target [%.*s]\n", STR_FMT(&node->orig_uri));
+			result = -1;
+			break;
 		}
+
+		if(targets_tail == NULL) {
+			targets = target;
+		} else {
+			targets_tail->next = targets;
+		}
+		targets_tail = targets;
 		node = node->next;
 	}
 	lock_release(&dmq_node_list->lock);
 	LM_DBG("released dmq_node_list->lock\n");
-	return 0;
-error:
-	lock_release(&dmq_node_list->lock);
-	LM_DBG("released dmq_node_list->lock\n");
-	return -1;
+	
+	/*
+	 * Snapshot creation failed: don't send an incomplete broadcast
+	 */
+	if(result < 0) {
+		free_dmq_node_snapshot(targets);
+		return -1;
+	}
+
+	/*
+	 * Send outside node list lock-
+	 * dmq_send_mesage creats its SHM copy for the asynchrone TM callback
+	 */
+	node = targets;
+	while(node != NULL) {
+
+		next = node->next;
+
+		if(dmq_send_message(peer, body, node, resp_cback, max_forwards, content_type) < 0) {
+			LM_ERR("error sending DMQ messag to node [%.*s]\n", STR_FMT(&node->orig_uri));
+			/*
+			* Continue with remaining broadcast targets:
+			* avoid one unreachable node to hinder entire broadcast
+			*/
+			result = -1;
+		}
+		destroy_dmq_node(node, 0);
+		node = next;
+	}
+	return result;
 }
 
 int bcast_dmq_message(dmq_peer_t *peer, str *body, dmq_node_t *except,

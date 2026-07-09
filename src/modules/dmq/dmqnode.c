@@ -308,9 +308,11 @@ dmq_node_t *find_dmq_node_ip(dmq_node_list_t *list, dmq_node_t *node)
 }
 
 /**
- * @brief duplicate dmq node
+ * @brief duplicate a DMQ node
+ * The duplicated node is independent from the original node list entry.
+ * the URI is duplicated and parsed again, so that all URI pointers refer to the duplicated URI buffer.
  */
-dmq_node_t *shm_dup_node(dmq_node_t *node)
+static dmq_node_t *dup_dmq_node(dmq_node_t *node, int shm)
 {
 	dmq_node_t *newnode;
 	if(!node) {
@@ -318,29 +320,53 @@ dmq_node_t *shm_dup_node(dmq_node_t *node)
 		return NULL;
 	}
 	if(!node->orig_uri.s) {
-		LM_ERR("nod->orig_uri.s is null\n");
+		LM_ERR("node orig_uri is null\n");
 		return NULL;
 	}
 
-	newnode = shm_malloc(sizeof(dmq_node_t));
+	if(shm) {
+		newnode = shm_malloc(sizeof(dmq_node_t));
+	} else {
+		newnode = pkg_malloc(sizeof(dmq_node_t));
+	}
+
 	if(newnode == NULL) {
 		SHM_MEM_ERROR;
 		return NULL;
 	}
 	memcpy(newnode, node, sizeof(dmq_node_t));
+	newnode->next = NULL;
 	newnode->orig_uri.s = NULL;
-	if(shm_str_dup(&newnode->orig_uri, &node->orig_uri) < 0) {
-		goto error;
+	newnode->orig_uri.len = 0;
+
+	if(shm) {
+		if(shm_str_dup(&newnode->orig_uri, &node->orig_uri) < 0) {
+			goto error;
+		}
+	} else {
+		if(pkg_str_dup(&newnode->orig_uri, &node->orig_uri) < 0) {
+			goto error;
+		}
 	}
 	if(parse_uri(newnode->orig_uri.s, newnode->orig_uri.len, &newnode->uri)
 			< 0) {
-		LM_ERR("error in parsing node uri\n");
+		LM_ERR("error in parsing duplicate node URI\n");
 		goto error;
 	}
 	return newnode;
 error:
-	destroy_dmq_node(newnode, 1);
+	destroy_dmq_node(newnode, shm);
 	return NULL;
+}
+
+dmq_node_t *shm_dup_node(dmq_node_t *node)
+{
+	return dup_dmq_node(node, 1);
+}
+
+dmq_node_t *pkg_dup_node(dmq_node_t *node)
+{
+	return dup_dmq_node(node, 0);
 }
 
 /**
