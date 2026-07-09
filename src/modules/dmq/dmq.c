@@ -475,7 +475,7 @@ error:
 
 static const char *dmq_rpc_list_nodes_doc[2] = {"Print all nodes", 0};
 
-static void rpc_dmq_disable_node(rpc_t *rpc, void *ctx) 
+static void rpc_dmq_disable_node(rpc_t *rpc, void *ctx)
 {
 
 	str uri;
@@ -496,7 +496,7 @@ static void rpc_dmq_disable_node(rpc_t *rpc, void *ctx)
 static const char *dmq_disable_node_doc[2] = {
 		"Administratively disable a remote DMQ node", 0};
 
-static void rpc_dmq_enable_node(rpc_t *rpc, void *ctx) 
+static void rpc_dmq_enable_node(rpc_t *rpc, void *ctx)
 {
 
 	str uri;
