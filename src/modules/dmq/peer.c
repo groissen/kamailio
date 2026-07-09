@@ -90,7 +90,7 @@ dmq_peer_t *add_peer(dmq_peer_list_t *peer_list, dmq_peer_t *peer)
  */
 dmq_peer_t *find_peer(str peer_id)
 {
-	dmq_peer_t foo_peer;
+	dmq_peer_t foo_peer = {0};
 	foo_peer.peer_id = peer_id;
 	return search_peer_list(dmq_peer_list, &foo_peer);
 }

@@ -223,7 +223,7 @@ static void ht_dmq_cell_group_destroy()
  */
 int ht_dmq_initialize()
 {
-	dmq_peer_t not_peer;
+	dmq_peer_t not_peer = {0};
 
 	/* load the DMQ API */
 	if(dmq_load_api(&ht_dmqb) != 0) {

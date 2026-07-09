@@ -46,7 +46,7 @@ extern str dlg_dmq_peer_id;
 */
 int dlg_dmq_initialize()
 {
-	dmq_peer_t not_peer;
+	dmq_peer_t not_peer = {0};
 
 	/* load the DMQ API */
 	if(dmq_load_api(&dlg_dmqb) != 0) {

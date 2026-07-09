@@ -37,6 +37,7 @@ str dmq_node_status_str = str_init("status");
 str dmq_node_active_str = str_init("active");
 str dmq_node_not_active_str = str_init("not_active");
 str dmq_node_disabled_str = str_init("disabled");
+str dmq_node_pending_str = str_init("pending");
 
 /**
  * @brief get the string status of the node
@@ -52,6 +53,9 @@ str *dmq_get_status_str(int status)
 		}
 		case DMQ_NODE_DISABLED: {
 			return &dmq_node_disabled_str;
+		}
+		case DMQ_NODE_PENDING: {
+			return &dmq_node_pending_str;
 		}
 		default: {
 			return 0;
@@ -70,6 +74,8 @@ int dmq_get_status_int(str *status)
 		return DMQ_NODE_NOT_ACTIVE;
 	} else if(STR_EQ(*status, dmq_node_disabled_str)) {
 		return DMQ_NODE_DISABLED;
+	} else if(STR_EQ(*status, dmq_node_pending_str)) {
+		return DMQ_NODE_PENDING;
 	} else {
 		return 0;
 	}
@@ -492,19 +498,102 @@ error:
 }
 
 /**
+ * @brief update status of an existing DMQ node after a direct failure
+ */
+int update_dmq_node_status_on_direct_failure(
+		dmq_node_list_t *list, dmq_node_t *node)
+{
+	dmq_node_t *cur;
+	int old_status;
+	int new_status;
+	int pending_evt = 0;
+
+	if(list == NULL || node == NULL) {
+		LM_ERR("invalid parameters for direct node failure\n");
+		return -1;
+	}
+
+	lock_get(&list->lock);
+
+	cur = list->nodes;
+	while(cur) {
+		if(cmp_dmq_node(cur, node)) {
+			old_status = cur->status;
+			new_status = old_status;
+
+			switch(old_status) {
+				case DMQ_NODE_PENDING:
+					/*
+					 * The node has not yet been confirmed by direct
+					 * communication. Keep it pending.
+					 */
+					break;
+
+				case DMQ_NODE_ACTIVE:
+					new_status = DMQ_NODE_NOT_ACTIVE;
+					break;
+
+				case DMQ_NODE_NOT_ACTIVE:
+					new_status = DMQ_NODE_DISABLED;
+					break;
+
+				case DMQ_NODE_DISABLED:
+					break;
+
+				default:
+					LM_ERR("invalid DMQ node status [%d]\n",
+							old_status);
+					lock_release(&list->lock);
+					return -1;
+			}
+
+			if(new_status != old_status) {
+				cur->status = new_status;
+
+				if(!cur->local) {
+					pending_evt = new_status;
+				}
+			}
+
+			lock_release(&list->lock);
+
+			if(pending_evt) {
+				dmq_peer_run_event_route(cur);
+			}
+
+			return new_status != old_status;
+		}
+
+		cur = cur->next;
+	}
+
+	lock_release(&list->lock);
+	return 0;
+}
+
+/**
  * @brief update status of existing dmq node
  */
-int update_dmq_node_status(dmq_node_list_t *list, dmq_node_t *node, int status)
+int update_dmq_node_status_ex(dmq_node_list_t *list, dmq_node_t *node, int status, int *old_status)
 {
 	dmq_node_t *cur;
 	int oldst;
 	int pending_evt = 0;
+	if(old_status) {
+		*old_status = -1;
+	}
+	if(!list || !node) {
+		return 0;
+	}
 	LM_DBG("trying to acquire dmq_node_list->lock\n");
 	lock_get(&list->lock);
 	LM_DBG("acquired dmq_node_list->lock\n");
 	cur = list->nodes;
 	while(cur) {
 		if(cmp_dmq_node(cur, node)) {
+			if(old_status) {
+				*old_status = cur->status;
+			}
 			oldst = cur->status;
 			cur->status = status;
 			if(!cur->local) {
@@ -529,6 +618,11 @@ int update_dmq_node_status(dmq_node_list_t *list, dmq_node_t *node, int status)
 	lock_release(&list->lock);
 	LM_DBG("released dmq_node_list->lock\n");
 	return 0;
+}
+
+int update_dmq_node_status(dmq_node_list_t *list, dmq_node_t *node, int status)
+{
+	return update_dmq_node_status_ex(list, node, status, NULL);
 }
 
 /**

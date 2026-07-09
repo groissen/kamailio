@@ -40,7 +40,7 @@ int rtpengine_dmq_request_sync(dmq_node_t *node);
 */
 int rtpengine_dmq_init()
 {
-	dmq_peer_t not_peer;
+	dmq_peer_t not_peer = {0};
 
 	/* load the DMQ API */
 	if(dmq_load_api(&rtpengine_dmqb) != 0) {

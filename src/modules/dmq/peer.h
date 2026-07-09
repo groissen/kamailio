@@ -47,12 +47,15 @@ typedef int (*peer_callback_t)(
 		struct sip_msg *, peer_reponse_t *resp, dmq_node_t *node);
 typedef int (*init_callback_t)(dmq_node_t *dmq_node);
 
+typedef int (*recovery_callback_t)(dmq_node_t *node);
+
 typedef struct dmq_peer
 {
 	str peer_id;
 	str description;
 	peer_callback_t callback;
 	init_callback_t init_callback;
+	recovery_callback_t recovery_callback;
 	struct dmq_peer *next;
 } dmq_peer_t;
 

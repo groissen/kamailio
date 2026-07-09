@@ -33,6 +33,7 @@
 #include "peer.h"
 #include "dmq_funcs.h"
 
+extern int dmq_node_status_mode;
 extern str dmq_notification_content_type;
 extern int *dmq_init_callback_done;
 

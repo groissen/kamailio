@@ -325,7 +325,7 @@ done:
 
 int usrloc_dmq_initialize()
 {
-	dmq_peer_t not_peer;
+	dmq_peer_t not_peer = {0};
 	str dmq_server_socket;
 
 	/* load the DMQ API */

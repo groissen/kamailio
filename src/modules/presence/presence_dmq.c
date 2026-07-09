@@ -45,7 +45,7 @@ int pres_dmq_request_sync(dmq_node_t *dmq_node);
 */
 int pres_dmq_initialize()
 {
-	dmq_peer_t not_peer;
+	dmq_peer_t not_peer = {0};
 
 	/* load the DMQ API */
 	if(dmq_load_api(&pres_dmqb) != 0) {

@@ -79,6 +79,7 @@ int dmq_fail_count_threshold_disabled = 1;
 int dmq_init_with_single = 0;
 str dmq_event_callback = STR_NULL;
 int dmq_sl_send = 0;
+int dmq_node_status_mode = DMQ_NODE_STATUS_LEGACY;
 
 /* TM bind */
 struct tm_binds _dmq_tmb = {0};
@@ -147,6 +148,7 @@ static param_export_t params[] = {
 	{"init_with_single", PARAM_INT, &dmq_init_with_single},
 	{"event_callback", PARAM_STR, &dmq_event_callback},
 	{"sl_send", PARAM_INT, &dmq_sl_send},
+	{"node_status_mode", PARAM_INT, &dmq_node_status_mode},
 	{0, 0, 0}
 };
 
@@ -302,6 +304,13 @@ static int mod_init(void)
 	}
 	if(register_timer(ping_servers, 0, dmq_ping_interval) < 0) {
 		LM_ERR("cannot register timer callback\n");
+		return -1;
+	}
+
+	if(dmq_node_status_mode != DMQ_NODE_STATUS_LEGACY
+		&& dmq_node_status_mode != DMQ_NODE_STATUS_DIRECT) {
+		LM_ERR("invalid node_status_mode value [%d], expected 0 or 1\n",
+				dmq_node_status_mode);
 		return -1;
 	}
 

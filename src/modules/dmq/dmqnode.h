@@ -39,6 +39,10 @@
 #define DMQ_NODE_ACTIVE 1 << 1
 #define DMQ_NODE_NOT_ACTIVE 1 << 2
 #define DMQ_NODE_DISABLED 1 << 3
+#define DMQ_NODE_PENDING 1 << 4
+
+#define DMQ_NODE_STATUS_LEGACY 0
+#define DMQ_NODE_STATUS_DIRECT 1
 
 typedef struct dmq_node
 {
@@ -77,6 +81,8 @@ int dmq_node_del_by_uri(dmq_node_list_t *list, str *suri);
 int cmp_dmq_node(dmq_node_t *node, dmq_node_t *cmpnode);
 int cmp_dmq_node_ip(dmq_node_t *node, dmq_node_t *cmpnode);
 int update_dmq_node_status(dmq_node_list_t *list, dmq_node_t *node, int status);
+int update_dmq_node_status_ex(
+		dmq_node_list_t *list, dmq_node_t *node, int status, int *old_status);
 int update_dmq_node_status_on_timeout(
 		dmq_node_list_t *list, dmq_node_t *node, int fail_count_status);
 dmq_node_t *shm_dup_node(dmq_node_t *node);
@@ -89,6 +95,9 @@ int set_dmq_node_params(dmq_node_t *node, param_t *params);
 str *dmq_get_status_str(int status);
 int dmq_get_status_int(str *status);
 int build_node_str(dmq_node_t *node, char *buf, int buflen);
+
+int update_dmq_node_status_on_direct_failure(
+		dmq_node_list_t *list, dmq_node_t *node);
 
 int reset_dmq_node_fail_count(dmq_node_list_t *list, dmq_node_t *node);
 
