@@ -210,8 +210,14 @@ int bcast_dmq_message1(dmq_peer_t *peer, str *body, dmq_node_t *except,
 		 *   - any inactive nodes (unless incl_inactive is specified)
 		 */
 		if((except && cmp_dmq_node(node, except)) || node->local
+				|| node->admin_disabled
 				|| (node->status != DMQ_NODE_ACTIVE && !incl_inactive)) {
-			LM_DBG("skipping node %.*s\n", STR_FMT(&node->orig_uri));
+			if(node->admin_disabled) {
+				LM_DBG("skipping administratively disabled DMQ node [%.*s]\n",
+						STR_FMT(&node->orig_uri));
+			} else {
+				LM_DBG("skipping node %.*s\n", STR_FMT(&node->orig_uri));
+			}
 			node = node->next;
 			continue;
 		}
@@ -527,7 +533,8 @@ int ki_dmq_t_replicate_mode(struct sip_msg *msg, int mode)
 		 *   - ourself
 		 *   - any inactive nodes
 		 */
-		if(node->local || node->status != DMQ_NODE_ACTIVE) {
+		if(node->local || node->admin_disabled
+				|| node->status != DMQ_NODE_ACTIVE) {
 			LM_DBG("skipping node %.*s\n", STR_FMT(&node->orig_uri));
 			node = node->next;
 			continue;
@@ -793,6 +800,12 @@ error:
 int dmq_send_message(dmq_peer_t *peer, str *body, dmq_node_t *node,
 		dmq_resp_cback_t *resp_cback, int max_forwards, str *content_type)
 {
+	if(node->admin_disabled) {
+		LM_DBG("DMQ node [%.*s] is administratively disabled\n",
+				STR_FMT(&node->orig_uri));
+		return -1;
+	}
+
 	if(dmq_sl_send && !resp_cback) {
 		return dmq_sl_send_message(
 				peer, body, node, max_forwards, content_type);

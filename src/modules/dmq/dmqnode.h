@@ -52,6 +52,7 @@ typedef struct dmq_node
 	struct sip_uri uri;		   /* parsed uri string */
 	struct ip_addr ip_address; /* resolved IP address */
 	int status; /* reserved - maybe something like active,timeout,disabled */
+	int admin_disabled; /* Local administrative state: if 1 = no messages or pings are sent to this node*/
 	int last_notification; /* last notification received from the node */
 	int last_peer_evt; /* last DMQ_NODE_* peer event_route emitted; 0 = none */
 	struct dmq_node *next; /* pointer to the next struct dmq_node */
@@ -91,6 +92,7 @@ void destroy_dmq_node(dmq_node_t *node, int shm);
 void shm_free_node(dmq_node_t *node);
 void pkg_free_node(dmq_node_t *node);
 int set_dmq_node_params(dmq_node_t *node, param_t *params);
+int set_dmq_node_admin_state(dmq_node_list_t *list, str *uri, int disabled);
 
 str *dmq_get_status_str(int status);
 int dmq_get_status_int(str *status);

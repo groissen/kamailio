@@ -169,6 +169,7 @@ error:
 int set_default_dmq_node_params(dmq_node_t *node)
 {
 	node->status = DMQ_NODE_ACTIVE;
+	node->admin_disabled = 0;
 	return 0;
 }
 
@@ -393,6 +394,64 @@ void pkg_free_node(dmq_node_t *node)
 	if(node->orig_uri.s != NULL)
 		pkg_free(node->orig_uri.s);
 	pkg_free(node);
+}
+
+int set_dmq_node_admin_state(
+		dmq_node_list_t *list, str *uri, int disabled)
+{
+	dmq_node_t *node;
+	int new_state;
+
+	if(list == NULL || uri == NULL || uri->s == NULL || uri->len <= 0) {
+		LM_ERR("invalid parameters for DMQ node admin state update\n");
+		return -1;
+	}
+
+	new_state = disabled ? 1 : 0;
+
+	lock_get(&list->lock);
+
+	node = find_dmq_node_uri(list, uri);
+	if(node == NULL) {
+		lock_release(&list->lock);
+		LM_ERR("DMQ node [%.*s] not found\n", STR_FMT(uri));
+		return -1;
+	}
+
+	if(node->local) {
+		lock_release(&list->lock);
+		LM_ERR("cannot change administrative state of local DMQ node\n");
+		return -1;
+	}
+
+	if(node->admin_disabled == new_state) {
+		lock_release(&list->lock);
+		LM_DBG("DMQ node [%.*s] is already administratively %s\n",
+				STR_FMT(uri), new_state ? "disabled" : "enabled");
+		return 0;
+	}
+
+	node->admin_disabled = new_state;
+
+	/*
+	 * Re-enabled nodes must be verified again before becoming active.
+	 */
+	if(!node->admin_disabled) {
+		node->fail_count = 0;
+
+		if(dmq_node_status_mode == DMQ_NODE_STATUS_DIRECT) {
+			node->status = DMQ_NODE_PENDING;
+		} else {
+			node->status = DMQ_NODE_NOT_ACTIVE;
+		}
+	}
+
+	lock_release(&list->lock);
+
+	LM_INFO("DMQ node [%.*s] administratively %s\n",
+			STR_FMT(uri), new_state ? "disabled" : "enabled");
+
+	return 0;
 }
 
 /**

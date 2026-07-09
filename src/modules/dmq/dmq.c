@@ -452,11 +452,16 @@ static void dmq_rpc_list_nodes(rpc_t *rpc, void *c)
 		ip_addr2sbuf(&cur->ip_address, ip, IP6_MAX_STR_SIZE);
 		if(rpc->add(c, "{", &h) < 0)
 			goto error;
-		if(rpc->struct_add(h, "SSssSddd", "host", &cur->uri.host, "port",
-				   &cur->uri.port, "proto", get_proto_name(cur->uri.proto),
-				   "resolved_ip", ip, "status", dmq_get_status_str(cur->status),
-				   "last_notification", cur->last_notification, "local",
-				   cur->local, "fail_count", cur->fail_count)
+		if(rpc->struct_add(h, "SSssSdddd",
+				"host", &cur->uri.host,
+				"port", &cur->uri.port,
+				"proto", get_proto_name(cur->uri.proto),
+				"resolved_ip", ip,
+				"status", dmq_get_status_str(cur->status),
+				"admin_disabled", cur->admin_disabled,
+				"last_notification", cur->last_notification,
+				"local", cur->local,
+				"fail_count", cur->fail_count)
 				< 0)
 			goto error;
 		cur = cur->next;
@@ -469,6 +474,48 @@ error:
 }
 
 static const char *dmq_rpc_list_nodes_doc[2] = {"Print all nodes", 0};
+
+static void rpc_dmq_disable_node(rpc_t *rpc, void *ctx) 
+{
+
+	str uri;
+
+	if(rpc->scan(ctx, "S", &uri) < 1) {
+		rpc->fault(ctx, 400, "Missing DMQ node URI");
+		return;
+	}
+
+	if(set_dmq_node_admin_state(dmq_node_list, &uri, 1) < 0) {
+		rpc->fault(ctx, 404, "DMQ node not found");
+		return;
+	}
+
+	rpc->add(ctx, "s", "DMQ node disabled");
+}
+
+static const char *dmq_disable_node_doc[2] = {
+		"Administratively disable a remote DMQ node", 0};
+
+static void rpc_dmq_enable_node(rpc_t *rpc, void *ctx) 
+{
+
+	str uri;
+
+	if(rpc->scan(ctx, "S", &uri) < 1) {
+		rpc->fault(ctx, 400, "Missing DMQ node URI");
+		return;
+	}
+
+	if(set_dmq_node_admin_state(dmq_node_list, &uri, 0) < 0) {
+		rpc->fault(ctx, 404, "DMQ node not found");
+		return;
+	}
+
+	rpc->add(ctx, "s", "DMQ node enabled");
+}
+
+static const char *dmq_enable_node_doc[2] = {
+		"Administratively enable a remote DMQ node", 0};
 
 void rpc_dmq_remove(rpc_t *rpc, void *ctx)
 {
@@ -553,6 +600,8 @@ static rpc_export_t rpc_methods[] = {{"dmq.list_nodes", dmq_rpc_list_nodes,
 		{"dmq.remove", rpc_dmq_remove, rpc_dmq_remove_doc, 0},
 		{"dmq.change_status", rpc_dmq_change_status, rpc_dmq_change_status_doc,
 				0},
+		{"dmq.disable_node", rpc_dmq_disable_node, dmq_disable_node_doc, 0},
+		{"dmq.enable_node", rpc_dmq_enable_node, dmq_enable_node_doc, 0},
 		{0, 0, 0, 0}};
 
 /**
